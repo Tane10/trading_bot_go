@@ -5,8 +5,10 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"math"
 	"math/big"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
@@ -60,6 +62,7 @@ type APIKeyClaims struct {
 	URI string `json:"uri"`
 }
 
+// Building and signing temp JWT token
 func buildJWT(uri string) (string, error) {
 	apiKeyName, pemData := loadEnvs()
 
@@ -102,13 +105,45 @@ func buildJWT(uri string) (string, error) {
 	}
 
 	return jwtString, nil
+}
+
+func testReq(token string) {
+
+	url := "https://api.coinbase.com/api/v3/brokerage/accounts"
+
+	req, err := http.NewRequest("GET", url, nil)
+
+	if err != nil {
+		fmt.Println("Error creating request:", err)
+		return
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %v", token))
+
+	client := &http.Client{}
+
+	resp, err := client.Do(req)
+
+	if err != nil {
+		log.Errorf("Failed to make request: %v", err)
+	}
+
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+
+	if err != nil {
+		log.Errorln("Failed to read Body of response")
+	}
+
+	fmt.Printf("%s", body)
 
 }
 
 func main() {
 	requestMethod := "GET"
 	requestHost := "api.coinbase.com"
-	requestPath := "/v2/accounts"
+	requestPath := "/api/v3/brokerage/accounts"
 
 	uri := fmt.Sprintf("%s %s%s", requestMethod, requestHost, requestPath)
 
@@ -118,5 +153,5 @@ func main() {
 		log.Errorf("error building jwt: %v", err)
 	}
 
-	fmt.Println(fmt.Sprintf("export JWT= %w", jwt))
+	testReq(jwt)
 }
