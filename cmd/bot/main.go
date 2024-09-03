@@ -8,6 +8,7 @@ import (
 	"math"
 	"math/big"
 	"os"
+	"path/filepath"
 	"time"
 
 	jose "github.com/go-jose/go-jose/v4"
@@ -16,16 +17,28 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func loadEnvs() (string, string) {
+func loadEnvs() (string, []byte) {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error to load .env file: %v", err)
 	}
 
 	apiKeyName := os.Getenv("API_KEY_NAME")
-	secret := os.Getenv("SECRET")
 
-	return apiKeyName, secret
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Println("Error getting current directory:", err)
+	}
+
+	filePath := filepath.Join(cwd, "secret.pem")
+
+	pemData, err := os.ReadFile(filePath)
+
+	if err != nil {
+		log.Fatalf("Error reading PEM file: %v", err)
+	}
+
+	return apiKeyName, pemData
 }
 
 var maxInt = big.NewInt(math.MaxInt64)
@@ -48,13 +61,13 @@ type APIKeyClaims struct {
 }
 
 func buildJWT(uri string) (string, error) {
-	apiKeyName, secret := loadEnvs()
+	apiKeyName, pemData := loadEnvs()
 
-	block, rest := pem.Decode([]byte(secret))
+	block, rest := pem.Decode(pemData)
 
 	if block == nil {
+		fmt.Println(block)
 		fmt.Println(string(rest))
-		// log.Errorf("error: %v", rest)
 		return "", fmt.Errorf("jwt: Could not decode private key")
 	}
 
@@ -106,5 +119,4 @@ func main() {
 	}
 
 	fmt.Println(fmt.Sprintf("export JWT= %w", jwt))
-
 }
